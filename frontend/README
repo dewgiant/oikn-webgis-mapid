@@ -1,0 +1,39 @@
+# Frontend — MapLibre GL JS + Vite
+
+## Menjalankan
+
+```bash
+npm install
+npm run dev      # Development: http://localhost:3000
+npm run build    # Build production → dist/
+npm run preview  # Preview hasil build
+```
+
+## Fitur Peta
+
+- 4 basemap: OSM, Satelit, Dark, Topo
+- Layer kawasan (polygon) dengan color-coding per jenis
+- Layer jalan (polyline) dengan style per kelas & kondisi
+- Layer infrastruktur (point) dengan 7 kategori + filter
+- Layer pemantauan lingkungan dengan status baku mutu
+- Layer WMS GeoServer (toggle)
+- Popup + info panel atribut lengkap
+- Koordinat kursor real-time
+
+## Struktur
+
+```
+frontend/
+├── index.html        ← Seluruh aplikasi peta (HTML + CSS + JS)
+├── package.json
+├── vite.config.js    ← Dev server + proxy ke GeoServer
+└── dist/             ← Hasil build (auto-generate)
+```
+
+## Konfigurasi WMS GeoServer
+
+Di `index.html`, cari bagian `toggleWMS()`:
+```javascript
+const WMS   = 'http://localhost:8080/geoserver/oikn/wms';
+const LAYER = 'oikn:kawasan';  // ganti sesuai layer yang dipublish
+```
