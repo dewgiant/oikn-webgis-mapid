@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebGIS IKN Nusantara — Kalimantan Timur</title>
+  <link href="https://unpkg.com/maplibre-gl@4.1.0/dist/maplibre-gl.css" rel="stylesheet" />
+  <style>
+    /* ─── Reset & Base ─────────────────────────────────── */
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    :root {
+      --bg-dark:   #0b1120;
+      --bg-panel:  #111827;
+      --bg-card:   #1f2937;
+      --border:    #2d3748;
+      --text:      #e2e8f0;
+      --text-muted:#94a3b8;
+      --accent:    #3b82f6;
+      --accent2:   #8b5cf6;
+      --green:     #10b981;
+      --yellow:    #f59e0b;
+      --red:       #ef4444;
+      --orange:    #f97316;
+    }
+    body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg-dark); color:var(--text); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+    /* ─── Header ──────────────────────────────────────── */
+    header {
+      background:var(--bg-panel);
+      border-bottom:1px solid var(--border);
+      padding:10px 20px;
+      display:flex; align-items:center; gap:14px;
+      flex-shrink:0; z-index:10;
+    }
+    .logo { width:38px;height:38px; background:linear-gradient(135deg,var(--accent),var(--accent2)); border-radius:10px; display:flex;align-items:center;justify-content:center; font-size:20px; flex-shrink:0; }
+    .header-title h1 { font-size:15px; font-weight:700; color:#f1f5f9; }
+    .header-title p  { font-size:11px; color:var(--text-muted); margin-top:1px; }
+    .header-right { margin-left:auto; display:flex; gap:8px; align-items:center; }
+    .badge { padding:4px 10px; border-radius:20px; font-size:11px; font-weight:600; }
+    .badge-blue { background:rgba(59,130,246,.15); color:#60a5fa; border:1px solid rgba(59,130,246,.3); }
+    .badge-green { background:rgba(16,185,129,.15); color:#34d399; border:1px solid rgba(16,185,129,.3); }
+
+    /* ─── Layout ──────────────────────────────────────── */
+    .layout { display:flex; flex:1; overflow:hidden; }
+
+    /* ─── Sidebar ─────────────────────────────────────── */
+    .sidebar {
+      width:290px; flex-shrink:0;
+      background:var(--bg-panel);
+      border-right:1px solid var(--border);
+      display:flex; flex-direction:column;
+      overflow:hidden;
+    }
+    .sidebar-scroll { overflow-y:auto; flex:1; }
+    .sidebar-scroll::-webkit-scrollbar { width:4px; }
+    .sidebar-scroll::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+
+    .section { padding:14px 16px; border-bottom:1px solid var(--border); }
+    .section-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1.2px; color:var(--text-muted); margin-bottom:10px; }
+
+    /* Basemap tabs */
+    .basemap-tabs { display:flex; gap:4px; }
+    .tab-btn { flex:1; padding:6px 4px; background:var(--bg-card); border:1px solid var(--border); border-radius:6px; color:var(--text-muted); font-size:11px; cursor:pointer; transition:all .2s; text-align:center; }
+    .tab-btn:hover { border-color:var(--accent); color:var(--text); }
+    .tab-btn.active { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+
+    /* Layer groups */
+    .layer-group { margin-bottom:6px; }
+    .layer-group-header { display:flex; align-items:center; gap:8px; padding:6px 0; cursor:pointer; }
+    .layer-group-header span { font-size:12px; font-weight:600; color:var(--text); }
+    .layer-group-header .count { margin-left:auto; font-size:10px; color:var(--text-muted); background:var(--bg-card); padding:2px 6px; border-radius:10px; }
+    .layer-item { display:flex; align-items:center; gap:8px; padding:5px 0 5px 18px; }
+    .layer-item input[type=checkbox] { accent-color:var(--accent); width:14px;height:14px; cursor:pointer; }
+    .color-dot { width:10px;height:10px; border-radius:50%;flex-shrink:0; }
+    .color-line { width:14px;height:3px; border-radius:2px;flex-shrink:0; }
+    .color-rect { width:12px;height:8px; border-radius:2px;flex-shrink:0; }
+    .layer-name { font-size:12px; color:var(--text-muted); flex:1; }
+    .layer-opacity { width:50px; accent-color:var(--accent); cursor:pointer; }
+
+    /* Stats */
+    .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .stat-card { background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:10px; text-align:center; }
+    .stat-value { font-size:18px; font-weight:700; color:var(--accent); }
+    .stat-label { font-size:10px; color:var(--text-muted); margin-top:2px; }
+
+    /* Info panel */
+    #info-content { font-size:12px; color:var(--text-muted); min-height:80px; }
+    .info-feature { animation:fadeIn .2s ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+    .info-name { font-size:13px; font-weight:600; color:var(--text); margin-bottom:8px; }
+    .info-row { display:flex; gap:8px; margin-bottom:4px; align-items:baseline; }
+    .info-key { color:var(--text-muted); min-width:70px; flex-shrink:0; }
+    .info-val { color:var(--text); flex:1; }
+    .status-badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:10px; font-weight:600; }
+    .status-beroperasi { background:rgba(16,185,129,.2); color:#34d399; }
+    .status-konstruksi { background:rgba(245,158,11,.2); color:#fbbf24; }
+    .status-rencana { background:rgba(139,92,246,.2); color:#a78bfa; }
+
+    /* Koordinat */
+    #coords { font-family:monospace; font-size:11px; color:var(--text-muted); line-height:1.8; }
+
+    /* ─── Map ─────────────────────────────────────────── */
+    #map { flex:1; position:relative; }
+
+    /* Popup */
+    .maplibregl-popup-content {
+      background:var(--bg-panel) !important;
+      color:var(--text) !important;
+      border:1px solid var(--border) !important;
+      border-radius:10px !important;
+      padding:14px 16px !important;
+      font-size:12px !important;
+      min-width:200px;
+      box-shadow:0 8px 32px rgba(0,0,0,.5) !important;
+    }
+    .maplibregl-popup-close-button { color:var(--text-muted) !important; font-size:18px !important; right:8px !important; top:8px !important; }
+    .popup-title { font-size:14px; font-weight:700; color:#f1f5f9; margin-bottom:8px; }
+    .popup-row { display:flex; gap:8px; margin-bottom:4px; font-size:12px; }
+    .popup-key { color:var(--text-muted); min-width:60px; }
+    .popup-val { color:var(--text); }
+
+    /* Scale bar & nav */
+    .maplibregl-ctrl-scale { background:rgba(17,24,39,.8); color:var(--text); border-color:var(--border) !important; font-size:10px; }
+
+    /* Tooltip */
+    #tooltip {
+      position:absolute; pointer-events:none; z-index:100;
+      background:var(--bg-panel); border:1px solid var(--border);
+      border-radius:6px; padding:6px 10px; font-size:11px; color:var(--text);
+      display:none; max-width:180px;
+    }
+
+    /* Legend */
+    .legend-item { display:flex; align-items:center; gap:8px; padding:3px 0; font-size:11px; color:var(--text-muted); }
+    .legend-dot  { width:10px;height:10px;border-radius:50%;flex-shrink:0; }
+  </style>
+</head>
+<body>
+
+<!-- ─── HEADER ──────────────────────────────────────────── -->
+<header>
+  <div class="logo">🗺️</div>
+  <div class="header-title">
+    <h1>WebGIS IKN Nusantara & Kalimantan Timur</h1>
+    <p>MapLibre GL JS · GeoServer · PostGIS · Docker</p>
+  </div>
+  <div class="header-right">
+    <span class="badge badge-blue">OIKN Training</span>
+    <span class="badge badge-green" id="status-badge">● Online</span>
+  </div>
+</header>
+
+<div class="layout">
+
+<!-- ─── SIDEBAR ─────────────────────────────────────────── -->
+<div class="sidebar">
+<div class="sidebar-scroll">
+
+  <!-- Basemap -->
+  <div class="section">
+    <div class="section-title">🗺 Basemap</div>
+    <div class="basemap-tabs">
+      <button class="tab-btn active" onclick="setBasemap('osm')">OSM</button>
+      <button class="tab-btn" onclick="setBasemap('satellite')">Satelit</button>
+      <button class="tab-btn" onclick="setBasemap('dark')">Dark</button>
+      <button class="tab-btn" onclick="setBasemap('topo')">Topo</button>
+    </div>
+  </div>
+
+  <!-- Statistik -->
+  <div class="section">
+    <div class="section-title">📊 Statistik Data</div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-value">26</div><div class="stat-label">Infrastruktur</div></div>
+      <div class="stat-card"><div class="stat-value">8</div><div class="stat-label">Kawasan</div></div>
+      <div class="stat-card"><div class="stat-value">6</div><div class="stat-label">Ruas Jalan</div></div>
+      <div class="stat-card"><div class="stat-value">8</div><div class="stat-label">Sta. Lingkungan</div></div>
+    </div>
+  </div>
+
+  <!-- Layer Control -->
+  <div class="section">
+    <div class="section-title">📂 Layer Control</div>
+
+    <!-- Kawasan -->
+    <div class="layer-group">
+      <div class="layer-group-header">
+        <span>🏗 Kawasan Wilayah</span>
+        <span class="count">8</span>
+      </div>
+      <div class="layer-item">
+        <input type="checkbox" id="lyr-kawasan" checked onchange="toggleLayer('kawasan-fill','kawasan-stroke', this.checked)" />
+        <span class="color-rect" style="background:rgba(59,130,246,.4);border:1.5px solid #3b82f6"></span>
+        <span class="layer-name">Kawasan (Polygon)</span>
+      </div>
+    </div>
+
+    <!-- Jalan -->
+    <div class="layer-group">
+      <div class="layer-group-header">
+        <span>🛣 Jaringan Jalan</span>
+        <span class="count">6</span>
+      </div>
+      <div class="layer-item">
+        <input type="checkbox" id="lyr-tol" checked onchange="filterJalan('tol', this.checked)" />
+        <span class="color-line" style="background:#f59e0b"></span>
+        <span class="layer-name">Jalan Tol</span>
+      </div>
+      <div class="layer-item">
+        <input type="checkbox" id="lyr-nasional" checked onchange="filterJalan('nasional', this.checked)" />
+        <span class="color-line" style="background:#ef4444"></span>
+        <span class="layer-name">Jalan Nasional</span>
+      </div>
+      <div class="layer-item">
+        <input type="checkbox" id="lyr-provinsi" checked onchange="filterJalan('provinsi', this.checked)" />
+        <span class="color-line" style="background:#94a3b8"></span>
+        <span class="layer-name">Jalan Provinsi</span>
+      </div>
+    </div>
+
+    <!-- Infrastruktur -->
+    <div class="layer-group">
+      <div class="layer-group-header">
+        <span>📌 Infrastruktur</span>
+        <span class="count">26</span>
+      </div>
+      <div class="layer-item">
+        <input type="checkbox" id="lyr-transportasi" checked onchange="filterInfra('Transportasi', this.checked)" />
+        <span class="color-dot" style="background:#3b82f6"></span>
+        <span class="layer-name">Transportasi</span>
+      </div>
+      <div class="layer-item">
+        <input type="checkbox" id="lyr-energi" checked onchange="filterInfra('Energi', this.checked)" />
+        <span class="color-dot" style="background:#f59e0b"></span>
+        <span class="layer-name">Energi</span>
+      </div>
+      <div class="layer-item">
+        <input type="checkbox" id="lyr-air" checked onchange="filterInfra('Air', this.checked)" />
+        <span class="color-dot" style="background:#06b6d4"></span>
+        <span class="layer-name">Air Bersih</span>
+      </div>
+      <div class="layer-item">
+        <input type="checkbox" id="lyr-telkom" checked onchange="filterInfra('Telekomunikasi', this.checked)" />
+        <span class="color-dot" style="background:#8b5cf6"></span>
+        <span class="layer-name">Telekomunikasi</span>
+      </div>
+      <div class="layer-item">
+        <input type="checkbox" id="lyr-kesehatan" checked onchange="filterInfra('Kesehatan', this.checked)" />
+        <span class="color-dot" style="background:#ef4444"></span>
+        <span class="layer-name">Kesehatan</span>
+      </div>
+      <div class="layer-item">
+        <input type="checkbox" id="lyr-pendidikan" checked onchange="filterInfra('Pendidikan', this.checked)" />
+        <span class="color-dot" style="background:#10b981"></span>
+        <span class="layer-name">Pendidikan</span>
+      </div>
+      <div class="layer-item">
+        <input type="checkbox" id="lyr-pemerintahan" checked onchange="filterInfra('Pemerintahan', this.checked)" />
+        <span class="color-dot" style="background:#f97316"></span>
+        <span class="layer-name">Pemerintahan</span>
+      </div>
+    </div>
+
+    <!-- Lingkungan -->
+    <div class="layer-group">
+      <div class="layer-group-header">
+        <span>🌿 Pemantauan Lingkungan</span>
+        <span class="count">8</span>
+      </div>
+      <div class="layer-item">
+        <input type="checkbox" id="lyr-lingkungan" checked onchange="toggleLayer('lingkungan', null, this.checked)" />
+        <span class="color-dot" style="background:#10b981;border:2px solid #fff"></span>
+        <span class="layer-name">Stasiun Pemantauan</span>
+      </div>
+    </div>
+
+    <!-- WMS GeoServer -->
+    <div class="layer-group">
+      <div class="layer-group-header">
+        <span>🌐 WMS GeoServer</span>
+      </div>
+      <div class="layer-item">
+        <input type="checkbox" id="lyr-wms" onchange="toggleWMS(this.checked)" />
+        <span class="color-dot" style="background:#f97316;border:2px dashed #f97316;background:transparent"></span>
+        <span class="layer-name">Layer WMS (lihat README)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legenda Status -->
+  <div class="section">
+    <div class="section-title">📋 Legenda Status</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#10b981"></span>Beroperasi</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#f59e0b"></span>Konstruksi</div>
+    <div class="legend-item"><span class="legend-dot" style="background:#8b5cf6"></span>Rencana</div>
+  </div>
+
+  <!-- Info Feature -->
+  <div class="section">
+    <div class="section-title">ℹ Informasi Fitur</div>
+    <div id="info-content">Klik fitur pada peta untuk melihat atribut lengkap.</div>
+  </div>
+
+  <!-- Koordinat -->
+  <div class="section">
+    <div class="section-title">📍 Posisi Kursor</div>
+    <div id="coords">—</div>
+  </div>
+
+</div><!-- sidebar-scroll -->
+</div><!-- sidebar -->
+
+<!-- ─── MAP ─────────────────────────────────────────────── -->
+<div id="map">
+  <div id="tooltip"></div>
+</div>
+
+</div><!-- layout -->
+
+<script src="https://unpkg.com/maplibre-gl@4.1.0/dist/maplibre-gl.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════
+//  DATA GeoJSON — Infrastruktur, Kawasan, Jalan, Lingkungan
+// ═══════════════════════════════════════════════════════════
+
+const DATA = {
+
+infrastruktur: { type:'FeatureCollection', features:[
+  {type:'Feature',geometry:{type:'Point',coordinates:[116.8943,-1.2683]},properties:{nama:'Bandara SAMS Sepinggan',kategori:'Transportasi',sub:'Bandar Udara',status:'Beroperasi',kapasitas:'10 juta penumpang/thn',pengelola:'AP I'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.2534,-0.3741]},properties:{nama:'Bandara APT Pranoto Samarinda',kategori:'Transportasi',sub:'Bandar Udara',status:'Beroperasi',kapasitas:'2 juta penumpang/thn',pengelola:'AP I'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[118.6203,2.2114]},properties:{nama:'Bandara Maratua Berau',kategori:'Transportasi',sub:'Bandar Udara',status:'Beroperasi',kapasitas:'300 ribu penumpang/thn',pengelola:'Kemenhub'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[116.8218,-1.2557]},properties:{nama:'Pelabuhan Semayang Balikpapan',kategori:'Transportasi',sub:'Pelabuhan',status:'Beroperasi',kapasitas:'5 juta ton/thn',pengelola:'Pelindo IV'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.1521,-0.4885]},properties:{nama:'Pelabuhan Samarinda',kategori:'Transportasi',sub:'Pelabuhan',status:'Beroperasi',kapasitas:'3 juta ton/thn',pengelola:'Pelindo IV'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[116.7613,-1.2086]},properties:{nama:'Pelabuhan Kariangau Balikpapan',kategori:'Transportasi',sub:'Pelabuhan',status:'Beroperasi',kapasitas:'8 juta ton/thn',pengelola:'Pelindo IV'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[116.6845,-1.3568]},properties:{nama:'Terminal Feri Penajam',kategori:'Transportasi',sub:'Pelabuhan',status:'Beroperasi',kapasitas:'1500 penumpang/hari',pengelola:'ASDP'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.0823,-0.3751]},properties:{nama:'PLTU Embalut Kutai Kartanegara',kategori:'Energi',sub:'Pembangkit Listrik',status:'Beroperasi',kapasitas:'200 MW',pengelola:'PLN Kaltimra'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[116.7986,-1.2501]},properties:{nama:'PLTU Teluk Balikpapan',kategori:'Energi',sub:'Pembangkit Listrik',status:'Beroperasi',kapasitas:'110 MW',pengelola:'PLN Kaltimra'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.1620,-0.8512]},properties:{nama:'PLTS IKN Nusantara',kategori:'Energi',sub:'Energi Terbarukan',status:'Konstruksi',kapasitas:'50 MW',pengelola:'PLN / OIKN'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.1510,-1.1280]},properties:{nama:'SPAM IKN Sepaku',kategori:'Air',sub:'Instalasi Air Minum',status:'Konstruksi',kapasitas:'300 liter/detik',pengelola:'PUPR / OIKN'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[116.8672,-1.2438]},properties:{nama:'PDAM Tirta Manuntung Balikpapan',kategori:'Air',sub:'Instalasi Air Minum',status:'Beroperasi',kapasitas:'1800 liter/detik',pengelola:'PDAM Balikpapan'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.0900,-1.0800]},properties:{nama:'Bendungan Sepaku Semoi',kategori:'Air',sub:'Bendungan',status:'Beroperasi',kapasitas:'16 juta m³',pengelola:'PUPR'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.1980,-0.9120]},properties:{nama:'Embung IKN Nusantara',kategori:'Air',sub:'Embung',status:'Konstruksi',kapasitas:'4 juta m³',pengelola:'PUPR / OIKN'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.1680,-0.8550]},properties:{nama:'BTS 5G Tower IKN',kategori:'Telekomunikasi',sub:'Menara BTS',status:'Konstruksi',kapasitas:'5G/4G',pengelola:'Telkomsel'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.1750,-0.8480]},properties:{nama:'Data Center IKN',kategori:'Telekomunikasi',sub:'Pusat Data',status:'Konstruksi',kapasitas:'Tier-3, 5 MW',pengelola:'Kominfo / OIKN'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[116.8542,-1.2682]},properties:{nama:'RSUD Dr. Kanujoso Djatiwibowo',kategori:'Kesehatan',sub:'Rumah Sakit',status:'Beroperasi',kapasitas:'450 TT',pengelola:'Pemprov Kaltim'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[116.8324,-1.2745]},properties:{nama:'RS Pertamina Balikpapan',kategori:'Kesehatan',sub:'Rumah Sakit',status:'Beroperasi',kapasitas:'200 TT',pengelola:'Pertamina'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.1810,-0.8700]},properties:{nama:'Rumah Sakit IKN Nusantara',kategori:'Kesehatan',sub:'Rumah Sakit',status:'Rencana',kapasitas:'300 TT',pengelola:'OIKN / Kemenkes'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.1601,-0.4520]},properties:{nama:'Universitas Mulawarman',kategori:'Pendidikan',sub:'Universitas',status:'Beroperasi',kapasitas:'30.000 mahasiswa',pengelola:'Kemendikbud'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[116.8812,-1.2510]},properties:{nama:'Universitas Balikpapan',kategori:'Pendidikan',sub:'Universitas',status:'Beroperasi',kapasitas:'8.000 mahasiswa',pengelola:'Swasta'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.1900,-0.8620]},properties:{nama:'Kampus IKN Nusantara',kategori:'Pendidikan',sub:'Universitas',status:'Rencana',kapasitas:'15.000 mahasiswa',pengelola:'OIKN / Kemendikbud'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.1692,-0.8434]},properties:{nama:'Istana Negara IKN',kategori:'Pemerintahan',sub:'Istana',status:'Konstruksi',kapasitas:'-',pengelola:'Setneg / OIKN'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.1750,-0.8500]},properties:{nama:'Gedung DPR/MPR IKN',kategori:'Pemerintahan',sub:'Legislatif',status:'Rencana',kapasitas:'-',pengelola:'Setneg / OIKN'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.1650,-0.8560]},properties:{nama:'Kantor Kementerian IKN',kategori:'Pemerintahan',sub:'Kementerian',status:'Konstruksi',kapasitas:'10 kementerian',pengelola:'OIKN'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.1710,-0.8600]},properties:{nama:'SPBU IKN Km 0',kategori:'Energi',sub:'Bahan Bakar',status:'Rencana',kapasitas:'500 KL/bulan',pengelola:'Pertamina'}},
+]},
+
+kawasan: { type:'FeatureCollection', features:[
+  {type:'Feature',geometry:{type:'MultiPolygon',coordinates:[[[[117.14,-0.88],[117.22,-0.88],[117.22,-0.82],[117.14,-0.82],[117.14,-0.88]]]]},properties:{nama:'Kawasan Inti Pusat Pemerintahan IKN',jenis:'IKN',luas_ha:5620,status:'Aktif - Konstruksi',kab_kota:'Penajam Paser Utara'}},
+  {type:'Feature',geometry:{type:'MultiPolygon',coordinates:[[[[116.98,-1.05],[117.35,-1.05],[117.35,-0.72],[116.98,-0.72],[116.98,-1.05]]]]},properties:{nama:'Kawasan Pengembangan IKN',jenis:'IKN',luas_ha:56180,status:'Aktif - Perencanaan',kab_kota:'Penajam Paser Utara'}},
+  {type:'Feature',geometry:{type:'MultiPolygon',coordinates:[[[[116.81,-1.10],[116.95,-1.10],[116.95,-1.00],[116.81,-1.00],[116.81,-1.10]]]]},properties:{nama:'Hutan Lindung Sungai Wain',jenis:'Hutan Lindung',luas_ha:9782,status:'Dilindungi',kab_kota:'Balikpapan'}},
+  {type:'Feature',geometry:{type:'MultiPolygon',coordinates:[[[[116.74,-1.22],[116.80,-1.22],[116.80,-1.15],[116.74,-1.15],[116.74,-1.22]]]]},properties:{nama:'Kawasan Industri Kariangau',jenis:'Industri',luas_ha:5130,status:'Aktif - Operasional',kab_kota:'Balikpapan'}},
+  {type:'Feature',geometry:{type:'MultiPolygon',coordinates:[[[[116.78,-1.32],[117.00,-1.32],[117.00,-1.18],[116.78,-1.18],[116.78,-1.32]]]]},properties:{nama:'Kota Balikpapan',jenis:'Permukiman',luas_ha:50330,status:'Aktif - Operasional',kab_kota:'Balikpapan'}},
+  {type:'Feature',geometry:{type:'MultiPolygon',coordinates:[[[[117.08,-0.58],[117.23,-0.58],[117.23,-0.40],[117.08,-0.40],[117.08,-0.58]]]]},properties:{nama:'Kota Samarinda',jenis:'Permukiman',luas_ha:71836,status:'Aktif - Operasional',kab_kota:'Samarinda'}},
+  {type:'Feature',geometry:{type:'MultiPolygon',coordinates:[[[[116.70,-1.28],[116.84,-1.28],[116.84,-1.15],[116.70,-1.15],[116.70,-1.28]]]]},properties:{nama:'Kawasan Mangrove Teluk Balikpapan',jenis:'Hutan Mangrove',luas_ha:12800,status:'Dilindungi',kab_kota:'Balikpapan/PPU'}},
+  {type:'Feature',geometry:{type:'MultiPolygon',coordinates:[[[[116.95,-0.50],[117.20,-0.50],[117.20,-0.25],[116.95,-0.25],[116.95,-0.50]]]]},properties:{nama:'Kawasan Pertambangan Kutai',jenis:'Pertambangan',luas_ha:45200,status:'Aktif - Operasional',kab_kota:'Kutai Kartanegara'}},
+]},
+
+jalan: { type:'FeatureCollection', features:[
+  {type:'Feature',geometry:{type:'MultiLineString',coordinates:[[[116.85,-1.25],[116.95,-1.10],[117.05,-0.80],[117.14,-0.55]]]},properties:{nama:'Tol Balikpapan–Samarinda (Balsam)',kelas:'Tol',permukaan:'Beton',kondisi:'Baik',panjang_km:99.35}},
+  {type:'Feature',geometry:{type:'MultiLineString',coordinates:[[[116.82,-1.22],[116.72,-1.28],[116.68,-1.35]]]},properties:{nama:'Tol Balikpapan–Penajam (Seksi I)',kelas:'Tol',permukaan:'Beton',kondisi:'Konstruksi',panjang_km:11.5}},
+  {type:'Feature',geometry:{type:'MultiLineString',coordinates:[[[116.83,-1.27],[117.00,-1.05],[117.18,-0.50],[117.25,-0.35]]]},properties:{nama:'Jalan Trans-Kalimantan Kaltim',kelas:'Nasional',permukaan:'Aspal',kondisi:'Sedang',panjang_km:287.5}},
+  {type:'Feature',geometry:{type:'MultiLineString',coordinates:[[[116.85,-1.22],[116.92,-1.10],[117.05,-0.98],[117.14,-0.88]]]},properties:{nama:'Jalan Akses IKN Koridor Utama',kelas:'Nasional',permukaan:'Beton',kondisi:'Konstruksi',panjang_km:47.5}},
+  {type:'Feature',geometry:{type:'MultiLineString',coordinates:[[[117.14,-0.82],[117.18,-0.84],[117.22,-0.86],[117.20,-0.90],[117.16,-0.92],[117.14,-0.88]]]},properties:{nama:'Jalan Lingkar Dalam IKN',kelas:'Nasional',permukaan:'Beton',kondisi:'Rencana',panjang_km:23.0}},
+  {type:'Feature',geometry:{type:'MultiLineString',coordinates:[[[116.82,-1.30],[116.75,-1.35],[116.70,-1.40],[116.68,-1.50]]]},properties:{nama:'Jalan Provinsi Balikpapan–Penajam',kelas:'Provinsi',permukaan:'Aspal',kondisi:'Sedang',panjang_km:35.2}},
+]},
+
+lingkungan: { type:'FeatureCollection', features:[
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.1200,-0.4600]},properties:{kode:'STN-AIR-001',nama:'Sungai Mahakam Hulu',jenis:'Kualitas Air',nilai:6.8,satuan:'pH',status_baku:'Normal'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[116.8800,-1.0800]},properties:{kode:'STN-AIR-002',nama:'Sungai Wain Hulu',jenis:'Kualitas Air',nilai:7.1,satuan:'pH',status_baku:'Normal'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[116.7800,-1.2000]},properties:{kode:'STN-AIR-003',nama:'Teluk Balikpapan',jenis:'Kualitas Air',nilai:7.8,satuan:'pH',status_baku:'Normal'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.0900,-1.1000]},properties:{kode:'STN-AIR-004',nama:'Sungai Sepaku — IKN',jenis:'Kualitas Air',nilai:6.5,satuan:'pH',status_baku:'Waspada'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[116.8500,-1.2600]},properties:{kode:'STN-UDR-001',nama:'Jl. Sudirman Balikpapan',jenis:'Kualitas Udara',nilai:45.2,satuan:'µg/m³ PM2.5',status_baku:'Normal'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[116.7700,-1.1900]},properties:{kode:'STN-UDR-002',nama:'Kaw. Industri Kariangau',jenis:'Kualitas Udara',nilai:87.5,satuan:'µg/m³ PM2.5',status_baku:'Waspada'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[117.1600,-0.8600]},properties:{kode:'STN-UDR-003',nama:'IKN Nusantara',jenis:'Kualitas Udara',nilai:12.3,satuan:'µg/m³ PM2.5',status_baku:'Normal'}},
+  {type:'Feature',geometry:{type:'Point',coordinates:[116.8600,-1.2500]},properties:{kode:'STN-BIS-001',nama:'Jl. MT Haryono Balikpapan',jenis:'Kebisingan',nilai:72.4,satuan:'dBA',status_baku:'Waspada'}},
+]}
+
+};
+
+// Warna
+const WARNA_KATEGORI = {
+  Transportasi:'#3b82f6', Energi:'#f59e0b', Air:'#06b6d4',
+  Telekomunikasi:'#8b5cf6', Kesehatan:'#ef4444', Pendidikan:'#10b981',
+  Pemerintahan:'#f97316'
+};
+const WARNA_KAWASAN = {
+  IKN:'#f97316', 'Hutan Lindung':'#15803d', Industri:'#94a3b8',
+  Permukiman:'#60a5fa', 'Hutan Mangrove':'#059669', Pertambangan:'#92400e'
+};
+const WARNA_JALAN = { Tol:'#f59e0b', Nasional:'#ef4444', Provinsi:'#94a3b8' };
+const WARNA_ENV = { Normal:'#10b981', Waspada:'#f59e0b', Kritis:'#ef4444' };
+const WARNA_STATUS = { Beroperasi:'#10b981', Konstruksi:'#f59e0b', Rencana:'#8b5cf6', Dilindungi:'#15803d' };
+
+// ═══════════════════════════════════════════════════════════
+//  BASEMAPS
+// ═══════════════════════════════════════════════════════════
+const BASEMAPS = {
+  osm:{version:8,sources:{osm:{type:'raster',tiles:['https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png','https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'],tileSize:256,attribution:'© OpenStreetMap contributors © CARTO'}},layers:[{id:'osm',type:'raster',source:'osm'}]},
+  satellite:{version:8,sources:{sat:{type:'raster',tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],tileSize:256,attribution:'© Esri World Imagery'}},layers:[{id:'sat',type:'raster',source:'sat'}]},
+  dark:{version:8,sources:{carto:{type:'raster',tiles:['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png','https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'],tileSize:256,attribution:'© CARTO'}},layers:[{id:'carto',type:'raster',source:'carto'}]},
+  topo:{version:8,sources:{topo:{type:'raster',tiles:['https://a.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png','https://b.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}.png'],tileSize:256,attribution:'© CARTO Light'}},layers:[{id:'topo',type:'raster',source:'topo'}]}
+};
+
+// ═══════════════════════════════════════════════════════════
+//  MAP INIT
+// ═══════════════════════════════════════════════════════════
+const map = new maplibregl.Map({
+  container:'map', style:BASEMAPS.osm,
+  center:[117.00, -0.95], zoom:8
+});
+map.addControl(new maplibregl.NavigationControl(),'top-right');
+map.addControl(new maplibregl.ScaleControl({unit:'metric'}),'bottom-right');
+map.addControl(new maplibregl.FullscreenControl(),'top-right');
+
+// Koordinat
+map.on('mousemove', e => {
+  document.getElementById('coords').innerHTML =
+    `Bujur: <b>${e.lngLat.lng.toFixed(6)}</b><br>Lintang: <b>${e.lngLat.lat.toFixed(6)}</b>`;
+});
+
+// ═══════════════════════════════════════════════════════════
+//  LOAD LAYERS
+// ═══════════════════════════════════════════════════════════
+map.on('load', () => {
+  // ── Kawasan (Polygon) ──────────────────────────────────
+  map.addSource('kawasan', {type:'geojson', data:DATA.kawasan});
+  map.addLayer({id:'kawasan-fill',type:'fill',source:'kawasan',paint:{
+    'fill-color':['match',['get','jenis'],'IKN','#f97316','Hutan Lindung','#15803d','Industri','#64748b','Permukiman','#3b82f6','Hutan Mangrove','#059669','Pertambangan','#92400e','#94a3b8'],
+    'fill-opacity':0.25
+  }});
+  map.addLayer({id:'kawasan-stroke',type:'line',source:'kawasan',paint:{
+    'line-color':['match',['get','jenis'],'IKN','#f97316','Hutan Lindung','#15803d','Industri','#64748b','Permukiman','#3b82f6','Hutan Mangrove','#059669','Pertambangan','#92400e','#94a3b8'],
+    'line-width':1.5,'line-opacity':0.8
+  }});
+  map.addLayer({id:'kawasan-label',type:'symbol',source:'kawasan',layout:{
+    'text-field':['get','nama'],'text-size':10,'text-max-width':8,'text-anchor':'center'
+  },paint:{'text-color':'#f1f5f9','text-halo-color':'#0b1120','text-halo-width':1.5}});
+
+  // ── Jalan (LineString) ─────────────────────────────────
+  map.addSource('jalan', {type:'geojson', data:DATA.jalan});
+  map.addLayer({id:'jalan-bg',type:'line',source:'jalan',paint:{
+    'line-color':'#0b1120','line-width':4,'line-opacity':0.5
+  }});
+  map.addLayer({id:'jalan-line',type:'line',source:'jalan',paint:{
+    'line-color':['match',['get','kelas'],'Tol','#f59e0b','Nasional','#ef4444','Provinsi','#94a3b8','#64748b'],
+    'line-width':['match',['get','kelas'],'Tol',3,'Nasional',2.5,'Provinsi',1.5,1.5],
+    'line-dasharray':['match',['get','kondisi'],'Konstruksi',['literal',[3,2]],'Rencana',['literal',[2,4]],['literal',[1,0]]]
+  }});
+
+  // ── Infrastruktur (Point) ──────────────────────────────
+  map.addSource('infrastruktur', {type:'geojson', data:DATA.infrastruktur});
+  map.addLayer({id:'infra-halo',type:'circle',source:'infrastruktur',paint:{
+    'circle-radius':14,'circle-color':'rgba(0,0,0,0.3)','circle-blur':1
+  }});
+  map.addLayer({id:'infrastruktur',type:'circle',source:'infrastruktur',paint:{
+    'circle-radius':8,
+    'circle-color':['match',['get','kategori'],'Transportasi','#3b82f6','Energi','#f59e0b','Air','#06b6d4','Telekomunikasi','#8b5cf6','Kesehatan','#ef4444','Pendidikan','#10b981','Pemerintahan','#f97316','#94a3b8'],
+    'circle-stroke-width':2,
+    'circle-stroke-color':['match',['get','status'],'Beroperasi','#fff','Konstruksi','#fbbf24','Rencana','#c4b5fd','#fff']
+  }});
+  map.addLayer({id:'infra-label',type:'symbol',source:'infrastruktur',
+    minzoom:10,
+    layout:{'text-field':['get','nama'],'text-size':10,'text-offset':[0,1.4],'text-anchor':'top','text-max-width':10},
+    paint:{'text-color':'#f1f5f9','text-halo-color':'#0b1120','text-halo-width':1.5}
+  });
+
+  // ── Lingkungan (Point) ─────────────────────────────────
+  map.addSource('lingkungan', {type:'geojson', data:DATA.lingkungan});
+  map.addLayer({id:'lingkungan',type:'circle',source:'lingkungan',paint:{
+    'circle-radius':7,
+    'circle-color':['match',['get','status_baku'],'Normal','#10b981','Waspada','#f59e0b','Kritis','#ef4444','#94a3b8'],
+    'circle-stroke-width':2,'circle-stroke-color':'#fff'
+  }});
+
+  // Klik handlers
+  setupClickHandlers();
+  setupHoverEffects();
+});
+
+// ═══════════════════════════════════════════════════════════
+//  CLICK & HOVER HANDLERS
+// ═══════════════════════════════════════════════════════════
+function setupClickHandlers() {
+  // Infrastruktur
+  map.on('click','infrastruktur', e => {
+    const p = e.features[0].properties;
+    const coord = e.features[0].geometry.coordinates;
+    const statusClass = 'status-'+p.status.toLowerCase().replace(' ','');
+    document.getElementById('info-content').innerHTML = `
+      <div class="info-feature">
+        <div class="info-name">${p.nama}</div>
+        <div class="info-row"><span class="info-key">Kategori</span><span class="info-val">${p.kategori} — ${p.sub}</span></div>
+        <div class="info-row"><span class="info-key">Status</span><span class="info-val"><span class="status-badge status-${p.status.toLowerCase().split(' ')[0]}">${p.status}</span></span></div>
+        <div class="info-row"><span class="info-key">Kapasitas</span><span class="info-val">${p.kapasitas||'—'}</span></div>
+        <div class="info-row"><span class="info-key">Pengelola</span><span class="info-val">${p.pengelola||'—'}</span></div>
+        <div class="info-row"><span class="info-key">Koordinat</span><span class="info-val" style="font-family:monospace;font-size:10px">${coord[1].toFixed(5)}, ${coord[0].toFixed(5)}</span></div>
+      </div>`;
+    new maplibregl.Popup()
+      .setLngLat(coord)
+      .setHTML(`<div class="popup-title">${p.nama}</div>
+        <div class="popup-row"><span class="popup-key">Tipe</span><span class="popup-val">${p.sub}</span></div>
+        <div class="popup-row"><span class="popup-key">Status</span><span class="popup-val">${p.status}</span></div>
+        <div class="popup-row"><span class="popup-key">Kapasitas</span><span class="popup-val">${p.kapasitas||'—'}</span></div>
+        <div class="popup-row"><span class="popup-key">Pengelola</span><span class="popup-val">${p.pengelola||'—'}</span></div>`)
+      .addTo(map);
+  });
+
+  // Kawasan
+  map.on('click','kawasan-fill', e => {
+    const p = e.features[0].properties;
+    document.getElementById('info-content').innerHTML = `
+      <div class="info-feature">
+        <div class="info-name">${p.nama}</div>
+        <div class="info-row"><span class="info-key">Jenis</span><span class="info-val">${p.jenis}</span></div>
+        <div class="info-row"><span class="info-key">Luas</span><span class="info-val">${Number(p.luas_ha).toLocaleString('id-ID')} Ha</span></div>
+        <div class="info-row"><span class="info-key">Status</span><span class="info-val">${p.status}</span></div>
+        <div class="info-row"><span class="info-key">Kab/Kota</span><span class="info-val">${p.kab_kota}</span></div>
+      </div>`;
+  });
+
+  // Jalan
+  map.on('click','jalan-line', e => {
+    const p = e.features[0].properties;
+    document.getElementById('info-content').innerHTML = `
+      <div class="info-feature">
+        <div class="info-name">${p.nama}</div>
+        <div class="info-row"><span class="info-key">Kelas</span><span class="info-val">${p.kelas}</span></div>
+        <div class="info-row"><span class="info-key">Permukaan</span><span class="info-val">${p.permukaan}</span></div>
+        <div class="info-row"><span class="info-key">Kondisi</span><span class="info-val">${p.kondisi}</span></div>
+        <div class="info-row"><span class="info-key">Panjang</span><span class="info-val">${p.panjang_km} km</span></div>
+      </div>`;
+  });
+
+  // Lingkungan
+  map.on('click','lingkungan', e => {
+    const p = e.features[0].properties;
+    const coord = e.features[0].geometry.coordinates;
+    document.getElementById('info-content').innerHTML = `
+      <div class="info-feature">
+        <div class="info-name">${p.nama}</div>
+        <div class="info-row"><span class="info-key">Kode</span><span class="info-val" style="font-family:monospace">${p.kode}</span></div>
+        <div class="info-row"><span class="info-key">Jenis</span><span class="info-val">${p.jenis}</span></div>
+        <div class="info-row"><span class="info-key">Nilai</span><span class="info-val">${p.nilai} ${p.satuan}</span></div>
+        <div class="info-row"><span class="info-key">Status</span><span class="info-val"><span class="status-badge status-${p.status_baku.toLowerCase()}">${p.status_baku}</span></span></div>
+      </div>`;
+  });
+}
+
+function setupHoverEffects() {
+  ['infrastruktur','kawasan-fill','jalan-line','lingkungan'].forEach(layer => {
+    map.on('mouseenter', layer, () => map.getCanvas().style.cursor = 'pointer');
+    map.on('mouseleave', layer, () => map.getCanvas().style.cursor = '');
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  KONTROL
+// ═══════════════════════════════════════════════════════════
+let currentBasemap = 'osm';
+
+function setBasemap(type) {
+  if (currentBasemap === type) return;
+  currentBasemap = type;
+  map.setStyle(BASEMAPS[type]);
+  map.once('styledata', reloadAllLayers);
+  document.querySelectorAll('.tab-btn').forEach((b,i) =>
+    b.classList.toggle('active', ['osm','satellite','dark','topo'][i] === type));
+}
+
+function reloadAllLayers() {
+  // Re-add semua source & layer
+  const sources = ['kawasan','jalan','infrastruktur','lingkungan'];
+  sources.forEach(s => { if (!map.getSource(s)) {
+    if (s === 'kawasan') {
+      map.addSource('kawasan',{type:'geojson',data:DATA.kawasan});
+      map.addLayer({id:'kawasan-fill',type:'fill',source:'kawasan',paint:{'fill-color':['match',['get','jenis'],'IKN','#f97316','Hutan Lindung','#15803d','Industri','#64748b','Permukiman','#3b82f6','Hutan Mangrove','#059669','Pertambangan','#92400e','#94a3b8'],'fill-opacity':0.25}});
+      map.addLayer({id:'kawasan-stroke',type:'line',source:'kawasan',paint:{'line-color':['match',['get','jenis'],'IKN','#f97316','Hutan Lindung','#15803d','Industri','#64748b','Permukiman','#3b82f6','Hutan Mangrove','#059669','Pertambangan','#92400e','#94a3b8'],'line-width':1.5}});
+    }
+    if (s === 'jalan') {
+      map.addSource('jalan',{type:'geojson',data:DATA.jalan});
+      map.addLayer({id:'jalan-bg',type:'line',source:'jalan',paint:{'line-color':'#0b1120','line-width':4,'line-opacity':0.5}});
+      map.addLayer({id:'jalan-line',type:'line',source:'jalan',paint:{'line-color':['match',['get','kelas'],'Tol','#f59e0b','Nasional','#ef4444','Provinsi','#94a3b8','#64748b'],'line-width':['match',['get','kelas'],'Tol',3,'Nasional',2.5,'Provinsi',1.5,1.5]}});
+    }
+    if (s === 'infrastruktur') {
+      map.addSource('infrastruktur',{type:'geojson',data:DATA.infrastruktur});
+      map.addLayer({id:'infrastruktur',type:'circle',source:'infrastruktur',paint:{'circle-radius':8,'circle-color':['match',['get','kategori'],'Transportasi','#3b82f6','Energi','#f59e0b','Air','#06b6d4','Telekomunikasi','#8b5cf6','Kesehatan','#ef4444','Pendidikan','#10b981','Pemerintahan','#f97316','#94a3b8'],'circle-stroke-width':2,'circle-stroke-color':'#fff'}});
+    }
+    if (s === 'lingkungan') {
+      map.addSource('lingkungan',{type:'geojson',data:DATA.lingkungan});
+      map.addLayer({id:'lingkungan',type:'circle',source:'lingkungan',paint:{'circle-radius':7,'circle-color':['match',['get','status_baku'],'Normal','#10b981','Waspada','#f59e0b','Kritis','#ef4444','#94a3b8'],'circle-stroke-width':2,'circle-stroke-color':'#fff'}});
+    }
+  }});
+  setupClickHandlers();
+  setupHoverEffects();
+}
+
+function toggleLayer(layerId, layerId2, visible) {
+  const v = visible ? 'visible' : 'none';
+  if (map.getLayer(layerId)) map.setLayoutProperty(layerId, 'visibility', v);
+  if (layerId2 && map.getLayer(layerId2)) map.setLayoutProperty(layerId2, 'visibility', v);
+}
+
+let hiddenKategori = new Set();
+function filterInfra(kategori, visible) {
+  if (!visible) hiddenKategori.add(kategori); else hiddenKategori.delete(kategori);
+  const filter = hiddenKategori.size === 0 ? null :
+    ['!', ['in', ['get','kategori'], ['literal', [...hiddenKategori]]]];
+  if (map.getLayer('infrastruktur')) map.setFilter('infrastruktur', filter);
+  if (map.getLayer('infra-label')) map.setFilter('infra-label', filter);
+}
+
+let hiddenJalan = new Set();
+function filterJalan(kelas, visible) {
+  if (!visible) hiddenJalan.add(kelas.charAt(0).toUpperCase()+kelas.slice(1));
+  else hiddenJalan.delete(kelas.charAt(0).toUpperCase()+kelas.slice(1));
+  const filter = hiddenJalan.size === 0 ? null :
+    ['!', ['in', ['get','kelas'], ['literal', [...hiddenJalan]]]];
+  if (map.getLayer('jalan-line')) map.setFilter('jalan-line', filter);
+  if (map.getLayer('jalan-bg'))   map.setFilter('jalan-bg', filter);
+}
+
+function toggleWMS(enabled) {
+  const WMS = 'http://localhost:8080/geoserver/oikn/wms';
+  const LAYER = 'oikn:kawasan';
+  if (enabled) {
+    if (!map.getSource('wms')) {
+      map.addSource('wms', {type:'raster',tiles:[`${WMS}?service=WMS&version=1.1.1&request=GetMap&layers=${LAYER}&bbox={bbox-epsg-3857}&width=256&height=256&srs=EPSG:3857&format=image/png&transparent=true`],tileSize:256});
+      map.addLayer({id:'wms-layer',type:'raster',source:'wms',paint:{'raster-opacity':0.7}});
+    } else { map.setLayoutProperty('wms-layer','visibility','visible'); }
+  } else {
+    if (map.getLayer('wms-layer')) map.setLayoutProperty('wms-layer','visibility','none');
+  }
+}
+</script>
+</body>
+</html>
