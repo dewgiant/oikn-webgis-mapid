@@ -1,0 +1,19 @@
+{
+  "name": "oikn-webgis-frontend",
+  "version": "2.0.0",
+  "description": "WebGIS IKN Nusantara & Kalimantan Timur — MapLibre GL JS + Vite",
+  "keywords": ["webgis", "maplibre", "geoserver", "postgis", "ikn", "kalimantan"],
+  "author": "OIKN Training",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "maplibre-gl": "^4.1.0"
+  },
+  "devDependencies": {
+    "vite": "^5.2.0"
+  }
+}
