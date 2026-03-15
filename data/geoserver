@@ -1,0 +1,107 @@
+# Konfigurasi GeoServer — OIKN WebGIS
+
+## Akses
+- URL: http://localhost:8080/geoserver/web
+- Username: `admin` | Password: `geoserver`
+
+---
+
+## A. Buat Workspace
+
+1. **Data** → **Workspaces** → **Add new workspace**
+2. Name: `oikn`
+3. Namespace URI: `http://oikn.go.id/gis`
+4. ✅ Default workspace → **Submit**
+
+---
+
+## B. Buat Store (koneksi ke PostGIS)
+
+1. **Data** → **Stores** → **Add new store** → **PostGIS**
+2. Workspace: `oikn`
+3. Data Source Name: `postgis_oikn`
+4. Isi koneksi:
+
+| Parameter | Nilai |
+|-----------|-------|
+| host      | postgis |
+| port      | 5432 |
+| database  | gisdb |
+| schema    | oikn |
+| user      | gisuser |
+| passwd    | gispassword |
+
+5. **Save**
+
+---
+
+## C. Publish Layers
+
+Untuk setiap tabel, klik **Publish**:
+
+### Layer 1: infrastruktur
+- Name: `infrastruktur`
+- Title: `Infrastruktur Kalimantan Timur & IKN`
+- SRS: `EPSG:4326`
+- Klik **Compute from data** (Bounding Box)
+- **Save**
+
+### Layer 2: kawasan
+- Name: `kawasan`
+- Title: `Kawasan Wilayah Kalimantan Timur`
+- SRS: `EPSG:4326`
+
+### Layer 3: jaringan_jalan
+- Name: `jaringan_jalan`
+- Title: `Jaringan Jalan Kalimantan Timur`
+- SRS: `EPSG:4326`
+
+### Layer 4: pemantauan_lingkungan
+- Name: `pemantauan_lingkungan`
+- Title: `Stasiun Pemantauan Lingkungan`
+- SRS: `EPSG:4326`
+
+---
+
+## D. Test Endpoint WMS/WFS
+
+### WMS GetCapabilities
+```
+http://localhost:8080/geoserver/oikn/wms?service=WMS&version=1.1.1&request=GetCapabilities
+```
+
+### WFS GetFeature (JSON)
+```
+http://localhost:8080/geoserver/oikn/wfs?service=WFS&version=2.0.0&request=GetFeature&typeName=oikn:infrastruktur&outputFormat=application/json&maxFeatures=10
+```
+
+### WMS GetMap (preview)
+```
+http://localhost:8080/geoserver/oikn/wms?service=WMS&VERSION=1.1.1&REQUEST=GetMap&FORMAT=image/png&TRANSPARENT=true&STYLES&LAYERS=oikn:kawasan&exceptions=application/vnd.ogc.se_xml&CRS=EPSG:4326&WIDTH=800&HEIGHT=600&BBOX=116.6,-1.4,117.4,-0.3
+```
+
+---
+
+## E. Styling (SLD)
+
+Contoh SLD untuk layer kawasan:
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<StyledLayerDescriptor version="1.0.0">
+  <NamedLayer>
+    <Name>oikn:kawasan</Name>
+    <UserStyle>
+      <FeatureTypeStyle>
+        <Rule>
+          <RasterSymbolizer>
+            <PolygonSymbolizer>
+              <Fill><CssParameter name="fill">#3b82f6</CssParameter></Fill>
+              <Stroke><CssParameter name="stroke">#1d4ed8</CssParameter></Stroke>
+            </PolygonSymbolizer>
+          </RasterSymbolizer>
+        </Rule>
+      </FeatureTypeStyle>
+    </UserStyle>
+  </NamedLayer>
+</StyledLayerDescriptor>
+```
